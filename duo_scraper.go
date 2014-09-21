@@ -18,7 +18,7 @@ func (u *User) save() error {
 }
 
 func main() {
-  resp, err := http.Get("https://www.duolingo.com/users/robcole42")
+  resp, err := http.Get("https://www.duolingo.com/users/nocashvaluedrumz")
   defer resp.Body.Close()
 
   data, err := ioutil.ReadAll(resp.Body)
@@ -32,23 +32,25 @@ func main() {
 
   m := f.(map[string]interface{})
 
-  var levels map[string]int
+  var points map[string]int
 
   languages := m["languages"].([]interface{})
 
   for i := range languages {
     lingo_map := languages[i].(map[string]interface{})
     ls := lingo_map["language_string"]
+    pts := lingo_map["points"]
     lvl := lingo_map["level"]
 
     // fmt.Printf("Lingo map is: %s\n", lingo_map)
     // fmt.Printf("Type is: %s\n", reflect.TypeOf(lingo_map))
     fmt.Printf("Language string is: %s\n", ls)
-    fmt.Printf("Level is: %v\n\n", lvl)
+    fmt.Printf("Level is: %v\n", lvl)
+    fmt.Printf("Total points: %v\n\n", pts)
     // levels[lingo_map["language_string"]] = lingo_map["level"]
   }
 
-  for k, v := range levels {
+  for k, v := range points {
     fmt.Println(k + ": " + string(v))
   }
 
