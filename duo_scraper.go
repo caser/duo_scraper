@@ -9,6 +9,7 @@ import (
   "time"
   "os"
   "io"
+  "sort"
   // "reflect"
 )
 
@@ -25,6 +26,19 @@ type scrapeHistory struct {
 
 type Output struct {
   Users []User
+}
+
+// define methods necessary for sorting output
+func (o Output) Len() int { return len(o.Users) }
+func (o Output) Swap(i, j int) { o.Users[i], o.Users[j] = o.Users[j], o.Users[i] }
+func (o Output) Less(i, j int) bool { return o.Users[i].Level() < o.Users[j].Level() }
+
+func (u User) Level() int {
+  return u.Languages["Spanish"]["Level"]
+}
+
+func (u User) Points() int {
+  return u.Languages["Spanish"]["Points"]
 }
 
 func (s *scrapeHistory) Save() error {
@@ -209,6 +223,7 @@ func leaderBoardHandler(w http.ResponseWriter, r *http.Request) {
   t, _ := template.ParseFiles("leaderboard.html")
   var o Output
   o.Users = loadUsers()
+  sort.Sort(sort.Reverse(o))
   t.Execute(w, o)
 }
 
@@ -242,12 +257,10 @@ func onStart() []User {
 }
 
 func main() {
-  users := onStart()
+  _ = onStart()
   
-  /*
   http.HandleFunc("/leaderboard/", leaderBoardHandler)
   http.ListenAndServe(":8080", nil)
-  */
 
-  fmt.Println(users)
+  // fmt.Println(users)
 }

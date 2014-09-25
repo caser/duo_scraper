@@ -6,21 +6,24 @@
 <body>
   <h1><center>DuoLingo Leaderboard</center></h1>
 
-  <table border="1">
-    <tr>
-      <th>Name</th>
-      <th>Username</th>
-      <th>Spanish Level</th>
-      <th>Points Yesterday</th>
-    </tr>
-    {{range .Users}}
+  <center>
+    <table border="1" width="80%">
       <tr>
-        <th>{{.Name}}</th>
-        <th>{{.UserName}}</th>
-        <th>{{.Languages.Spanish.Level}}</th>
+        <th width="25%">Name</th>
+        <th width="25%">Username</th>
+        <th width="25%">Spanish Level</th>
+        <th width="25%">Points Yesterday</th>
       </tr>
-    {{end}}
-  </table>
+      {{range .Users}}
+        <tr align="left">
+          <th>{{.Name}}</th>
+          <th>{{.UserName}}</th>
+          <th><center>{{.Languages.Spanish.Level}}</center></th>
+          <th><center>{{.DailyDiff}}</center></th>
+        </tr>
+      {{end}}
+    </table>
+  </center>
 </body>
 
 </html>
