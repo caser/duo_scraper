@@ -5,19 +5,18 @@ import (
   "net/http"
   "io/ioutil"
   "encoding/json"
+  "html/template"
   // "reflect"
 )
 
 type User struct {
-  Name string
-  UserName string
-  Languages []LingoData
+  Name, UserName string
+  // ex => Languages["Spanish"]["Points"]
+  Languages map[string]map[string]int
 }
 
-type LingoData struct {
-  Language string
-  Level int
-  Points int
+type Output struct {
+  Users []User
 }
 
 func (u *User) UnmarshalFromDL(data []byte) error {
@@ -27,16 +26,23 @@ func (u *User) UnmarshalFromDL(data []byte) error {
 
   languages := f.(map[string]interface{})["languages"].([]interface{})
 
-  var ld LingoData
-
   for i := range languages {
     lingo_map := languages[i].(map[string]interface{})
-    ld.Language = lingo_map["language_string"].(string)
-    ld.Level = int(lingo_map["level"].(float64))
-    ld.Points = int(lingo_map["points"].(float64))
-    u.Languages = append(u.Languages, ld)
-  }
+    language := lingo_map["language_string"].(string)
 
+    m := make(map[string]int)
+
+    m["Level"] = int(lingo_map["level"].(float64))
+    m["Points"] = int(lingo_map["points"].(float64))
+
+    if (*u).Languages[language] == nil {
+      language_map := make(map[string]map[string]int)
+      language_map[language] = m
+      (*u).Languages = language_map
+    } else {
+      (*u).Languages[language] = m
+    }
+  }
   return err
 }
 
@@ -111,32 +117,41 @@ func unmarshalSavedData(users *[]User, data []byte) {
     u.Name =  data_map["Name"].(string)
     u.UserName = data_map["UserName"].(string)
     
-    language_data := data_map["Languages"].([]interface{})
-    var ld LingoData
-
-    for i := range language_data {
-      lingo_map := language_data[i].(map[string]interface{})
-      ld.Language = lingo_map["Language"].(string)
-      ld.Level = int(lingo_map["Level"].(float64))
-      ld.Points = int(lingo_map["Points"].(float64))
-      u.Languages = append(u.Languages, ld)
+    lingo_map := data_map["Languages"].(map[string]map[string]int)
+    
+    for language, sub_map := range lingo_map {
+      u.Languages[language]["Level"] = sub_map["Level"]
+      u.Languages[language]["Points"] = sub_map["Points"]
     }
     *users = append(*users, u)
   }
 }
 
+func leaderBoardHandler(w http.ResponseWriter, r *http.Request) {
+  title := "DuoLingo Leaderboard:"
+  t, _ := template.ParseFiles("leaderboard.html")
+  // var u []User
+  t.Execute(w, title)
+}
+
 func main() {
   users := []User{}
 
-  data := loadUserData()
+  // data := loadUserData()
 
-  unmarshalSavedData(&users, data)
+  //unmarshalSavedData(&users, data)
 
-  fmt.Println(users[4])
+  /*
+  http.HandleFunc("/leaderboard/", leaderBoardHandler)
+  http.ListenAndServe(":8080", nil)
+  */
 
-  // seedUsers(&users)
+  seedUsers(&users)
 
-  // scrapeLanguageData(&users)
+  scrapeLanguageData(&users)
 
-  // saveUserData(users)
+  saveUserData(users)
+
+  fmt.Println(users)
+
 }
