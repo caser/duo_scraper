@@ -6,14 +6,20 @@
 <body>
   <h1><center>DuoLingo Leaderboard</center></h1>
 
-  <table>
+  <table border="1">
     <tr>
       <th>Name</th>
       <th>Username</th>
       <th>Spanish Level</th>
       <th>Points Yesterday</th>
     </tr>
-    <!-- ITERATE OVER GO LIST HERE --> 
+    {{range .Users}}
+      <tr>
+        <th>{{.Name}}</th>
+        <th>{{.UserName}}</th>
+        <th>{{.Languages.Spanish.Level}}</th>
+      </tr>
+    {{end}}
   </table>
 </body>
 

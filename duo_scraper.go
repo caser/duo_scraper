@@ -24,17 +24,22 @@ func (u *User) UnmarshalFromDL(data []byte) error {
 
   err := json.Unmarshal(data, &f)
 
+  // access "languages" part of JSON map through type assertions
   languages := f.(map[string]interface{})["languages"].([]interface{})
 
+  // iterate through languages and add to the user
   for i := range languages {
+    // type assert the langauge and get data
     lingo_map := languages[i].(map[string]interface{})
     language := lingo_map["language_string"].(string)
 
+    // intialize map to store JSON data
     m := make(map[string]int)
 
     m["Level"] = int(lingo_map["level"].(float64))
     m["Points"] = int(lingo_map["points"].(float64))
 
+    // check to see if user is already initialized and then add new data
     if (*u).Languages[language] == nil {
       language_map := make(map[string]map[string]int)
       language_map[language] = m
@@ -76,6 +81,7 @@ func scrapeLanguageData(users *[]User) {
       fmt.Println(err)
     }
 
+    // unmarshal scraped data from DuoLingo into a user
     err = user.UnmarshalFromDL(data); if err != nil {
       fmt.Println(err)
     }
@@ -106,52 +112,69 @@ func loadUserData() []byte {
 func unmarshalSavedData(users *[]User, data []byte) {
   var f interface{}
 
+  // unmarshal data into raw JSON
   _ = json.Unmarshal(data, &f)
 
   data_arr := f.([]interface{})
 
+  // iterate over JSON data
   for i := range data_arr {
     var u User
     data_map := data_arr[i].(map[string]interface{})
     
+    // gather simple primitive data from JSON
     u.Name =  data_map["Name"].(string)
     u.UserName = data_map["UserName"].(string)
+    u.Languages = make(map[string]map[string]int)
     
-    lingo_map := data_map["Languages"].(map[string]map[string]int)
-    
-    for language, sub_map := range lingo_map {
-      u.Languages[language]["Level"] = sub_map["Level"]
-      u.Languages[language]["Points"] = sub_map["Points"]
+    // iterate over languages map from the user and store in the struct
+    lingo_map := data_map["Languages"].(map[string]interface{})
+    for language, subset := range lingo_map {
+      sub_map := subset.(map[string]interface{})
+      u.Languages[language] = make(map[string]int)
+      u.Languages[language]["Level"] = int(sub_map["Level"].(float64))
+      u.Languages[language]["Points"] = int(sub_map["Points"].(float64))
     }
+    // append the new user to the users slice
     *users = append(*users, u)
   }
 }
 
 func leaderBoardHandler(w http.ResponseWriter, r *http.Request) {
-  title := "DuoLingo Leaderboard:"
   t, _ := template.ParseFiles("leaderboard.html")
-  // var u []User
-  t.Execute(w, title)
+  var o Output
+  o.Users = loadUsers()
+  t.Execute(w, o)
+}
+
+func loadUsers() []User {
+  users := []User{}
+
+  data := loadUserData()
+
+  unmarshalSavedData(&users, data)
+
+  return users
 }
 
 func main() {
-  users := []User{}
+  users := loadUsers()
 
-  // data := loadUserData()
-
-  //unmarshalSavedData(&users, data)
+  // TODO
+  // test passing output to http response handler
+  // test iterating through map's key value range in template
 
   /*
-  http.HandleFunc("/leaderboard/", leaderBoardHandler)
-  http.ListenAndServe(":8080", nil)
-  */
-
   seedUsers(&users)
 
   scrapeLanguageData(&users)
 
   saveUserData(users)
 
-  fmt.Println(users)
+  */
 
+  http.HandleFunc("/leaderboard/", leaderBoardHandler)
+  http.ListenAndServe(":8080", nil)
+
+  fmt.Println(users)
 }
