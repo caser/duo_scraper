@@ -6,17 +6,60 @@ import (
   "io/ioutil"
   "encoding/json"
   "html/template"
+  "time"
+  "os"
+  "io"
   // "reflect"
 )
 
 type User struct {
   Name, UserName string
+  DailyDiff int
   // ex => Languages["Spanish"]["Points"]
   Languages map[string]map[string]int
 }
 
+type scrapeHistory struct {
+  Date string
+}
+
 type Output struct {
   Users []User
+}
+
+func (s *scrapeHistory) Save() error {
+  filename := "scrape_history.txt"
+  // open file to which we append the latest scrape history
+  f, _ := os.OpenFile(filename, os.O_RDWR|os.O_APPEND, 0660);
+  output, err := json.Marshal(*s)
+  io.WriteString(f, string(output))
+  return err
+}
+
+func loadScrapeHistory() []scrapeHistory {
+  // read in file
+  filename := "scrape_history.txt"
+  data, _ := ioutil.ReadFile(filename)
+  // convert JSON to an interface which we can process
+  var f interface{}
+  if err := json.Unmarshal(data, &f); err != nil {
+    panic(err)
+  }
+  data_arr := f.([]interface{})
+  // fill an array of scrapeHisotry from the data
+  scrapeHistories := []scrapeHistory{}
+  for i := range data_arr {
+    sH := data_arr[i].(scrapeHistory)
+    fmt.Println(sH)
+    scrapeHistories = append(scrapeHistories, sH)
+  }
+  return scrapeHistories
+}
+
+func lastScrapeHistory() scrapeHistory {
+  sh := loadScrapeHistory()
+  last := sh[len(sh)]
+  return last
 }
 
 func (u *User) UnmarshalFromDL(data []byte) error {
@@ -39,13 +82,29 @@ func (u *User) UnmarshalFromDL(data []byte) error {
     m["Level"] = int(lingo_map["level"].(float64))
     m["Points"] = int(lingo_map["points"].(float64))
 
+    // initialize diff variable for calculating point differential
+    var diff int
+
     // check to see if user is already initialized and then add new data
     if (*u).Languages[language] == nil {
       language_map := make(map[string]map[string]int)
       language_map[language] = m
       (*u).Languages = language_map
     } else {
-      (*u).Languages[language] = m
+      // assign daily point differential to User
+      if language == "Spanish" {
+        // find difference between today's and yesterday's points
+        priorPoints := (*u).Languages[language]["Points"]
+        diff = m["Points"] - priorPoints
+      }
+
+      last_scrape := lastScrapeHistory()
+      scrape_date, _ := time.Parse(time.RFC1123, last_scrape.Date)
+
+      if time.Since(scrape_date) >= 24*time.Hour {
+        (*u).DailyDiff = diff
+        (*u).Languages[language] = m
+      }
     }
   }
   return err
@@ -88,6 +147,11 @@ func scrapeLanguageData(users *[]User) {
 
     (*users)[i] = user
   }
+
+  // create a log entry of this scrape
+  var s scrapeHistory
+  s.Date = time.Now().Format(time.RFC1123)
+  s.Save()
 }
 
 func saveUserData(users []User) error {
@@ -125,6 +189,7 @@ func unmarshalSavedData(users *[]User, data []byte) {
     // gather simple primitive data from JSON
     u.Name =  data_map["Name"].(string)
     u.UserName = data_map["UserName"].(string)
+    u.DailyDiff = int(data_map["DailyDiff"].(float64))
     u.Languages = make(map[string]map[string]int)
     
     // iterate over languages map from the user and store in the struct
@@ -157,24 +222,32 @@ func loadUsers() []User {
   return users
 }
 
+func onStart() []User {
+  // check if scrape_history.txt already exists, if not create it
+  if _, err := os.Stat("scrape_history.txt"); os.IsNotExist(err) {
+    os.Create("scrape_history.txt")
+  }
+  // check if user_data.txt already exists, if not create it
+  // and make initial scrape
+  var users []User
+  if _, err := os.Stat("user_data.txt"); os.IsNotExist(err) {
+    os.Create("user_data.txt")
+    seedUsers(&users)
+    scrapeLanguageData(&users)
+    saveUserData(users)
+  } else {
+    users = loadUsers()
+  }
+  return users
+}
+
 func main() {
-  users := loadUsers()
-
-  // TODO
-  // test passing output to http response handler
-  // test iterating through map's key value range in template
-
+  users := onStart()
+  
   /*
-  seedUsers(&users)
-
-  scrapeLanguageData(&users)
-
-  saveUserData(users)
-
-  */
-
   http.HandleFunc("/leaderboard/", leaderBoardHandler)
   http.ListenAndServe(":8080", nil)
+  */
 
   fmt.Println(users)
 }
